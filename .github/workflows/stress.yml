@@ -1,0 +1,64 @@
+name: stress
+
+on:
+  workflow_dispatch:
+
+  # the release calls this one, because a version on pypi is permanent and this is the only thing that runs the interleavings a graded suite never reaches
+  workflow_call:
+
+jobs:
+  stress:
+    runs-on: ubuntu-latest
+
+    # a loaded runner is slower than the machine these numbers were measured on, and a pipeline that hangs is a pipeline that burns
+    timeout-minutes: 30
+
+    services:
+      redis:
+        image: redis:7
+        ports: ["6399:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      mysql:
+        image: mysql:8.4
+        ports: ["3399:3306"]
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: queuefy
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      postgres:
+        image: postgres:16
+        ports: ["5499:5432"]
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: queuefy
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # one version, because what this asks about is the store under load and never the syntax around it
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[sqlalchemy,redis]" pytest pytest-asyncio pytest-cov pytest-timeout aiosqlite aiomysql asyncpg cryptography
+
+      - name: stress
+        run: python -m pytest -m stress
