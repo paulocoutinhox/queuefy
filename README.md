@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://pypi.org/project/queuefy/"><img src="https://img.shields.io/pypi/v/queuefy.svg" alt="PyPI version"></a>
   <a href="https://github.com/paulocoutinhox/queuefy/actions/workflows/test.yml"><img src="https://github.com/paulocoutinhox/queuefy/actions/workflows/test.yml/badge.svg" alt="Queuefy - Test"></a>
   <a href="https://codecov.io/gh/paulocoutinhox/queuefy"><img src="https://codecov.io/gh/paulocoutinhox/queuefy/graph/badge.svg" alt="Coverage"></a>
   <a href="https://github.com/paulocoutinhox/queuefy/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
