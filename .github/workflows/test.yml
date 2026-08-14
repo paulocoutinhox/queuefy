@@ -1,0 +1,141 @@
+name: test
+
+on:
+  push:
+    # branches and never tags, because a tag is the release, and the release calls this workflow itself
+    branches: ["**"]
+    paths-ignore: ["**.md"]
+  pull_request:
+    paths-ignore: ["**.md"]
+  workflow_dispatch:
+
+  # the release calls this one rather than repeating it, so nothing reaches pypi that the suite has not answered for
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # a pipeline that hangs is a pipeline that burns, and the suite takes under a minute
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+
+    services:
+      redis:
+        image: redis:7
+        ports: ["6399:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      mysql:
+        image: mysql:8.4
+        ports: ["3399:3306"]
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: queuefy
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      postgres:
+        image: postgres:16
+        ports: ["5499:5432"]
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: queuefy
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[sqlalchemy,redis]" pytest pytest-asyncio pytest-cov pytest-timeout ruff black aiosqlite aiomysql asyncpg cryptography
+
+      - name: lint
+        run: |
+          python -m ruff check .
+          python -m black --check .
+
+      - name: test
+        run: python -m pytest --cov --cov-report=term-missing --cov-report=xml
+
+      # one upload, because every version of the matrix answers the same gate and produces the same report
+      - name: coverage
+        if: matrix.python == '3.13'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: paulocoutinhox/queuefy
+          fail_ci_if_error: true
+
+  # the oldest version of each store the documentation says is supported, because a minimum nobody runs is a number in a table
+  oldest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      redis:
+        image: redis:7.0
+        ports: ["6399:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      mysql:
+        image: mysql:8.0
+        ports: ["3399:3306"]
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: queuefy
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      postgres:
+        image: postgres:14
+        ports: ["5499:5432"]
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: queuefy
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # one python, because what this asks about is the store and never the syntax around it
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[sqlalchemy,redis]" pytest pytest-asyncio pytest-cov pytest-timeout aiosqlite aiomysql asyncpg cryptography
+
+      - name: test
+        run: python -m pytest --cov
