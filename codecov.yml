@@ -1,0 +1,11 @@
+# the same gate the build already enforces, because a check that passes what the build fails is worse than no check
+coverage:
+  status:
+    project:
+      default:
+        target: 100%
+        threshold: 0%
+    patch:
+      default:
+        target: 100%
+        threshold: 0%
